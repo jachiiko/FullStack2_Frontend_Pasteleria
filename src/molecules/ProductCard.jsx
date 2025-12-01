@@ -2,20 +2,22 @@ import React from 'react';
 import Button from '../atoms/Button.jsx';
 
 export default function ProductCard({ product, onAdd }) {
-  const { imageUrl, imageurl, name, category, price } = product;
+  const imgSrc = product.imageUrl || product.imageurl;
 
   return (
     <div className="product-card">
       <img
-        src={imageUrl || imageurl}
-        alt={name}
+        src={imgSrc}
+        alt={product.name}
         style={{ objectFit: 'cover' }}
       />
 
       <div className="product-card-content">
-        {category && <div className="product-card-category">{category}</div>}
-        <div className="product-card-name">{name}</div>
-        <div className="product-card-price">${price.toLocaleString()}</div>
+        <div className="product-card-category">{product.category}</div>
+        <div className="product-card-name">{product.name}</div>
+        <div className="product-card-price">
+          ${product.price.toLocaleString('es-CL')}
+        </div>
 
         <Button className="add-btn" onClick={() => onAdd(product)}>
           Añadir
