@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../atoms/Input.jsx';
 import Select from '../atoms/Select.jsx';
 import Button from '../atoms/Button.jsx';
 import Card from '../atoms/Card.jsx';
-import { regiones } from '../data/regions.js';
-import { registerUser } from '../data/userStore.js';
+import { getRegions, register } from '../services/authService.js';
 
 // Dominios permitidos para el correo
 const ALLOWED_DOMAINS = ['duoc.cl', 'admin.cl'];
@@ -19,9 +18,28 @@ export default function RegisterPage() {
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
   const [direccion, setDireccion] = useState('');
-  const [region, setRegion] = useState(regiones[0].nombre);
-  const [comuna, setComuna] = useState(regiones[0].comunas[0]);
-  const [tipoUsuario, setTipoUsuario] = useState('Cliente');
+  const [regiones, setRegiones] = useState([]);
+  const [regionId, setRegionId] = useState('');
+  const [comuna, setComuna] = useState('');
+
+  useEffect(() => {
+    const fetchRegions = async () => {
+      try {
+        const data = await getRegions();
+        setRegiones(data);
+        if (data.length > 0) {
+          setRegionId(data[0].id || '');
+          setComuna(data[0].comunas?.[0] || '');
+        }
+      } catch (err) {
+        alert('No se pudieron cargar las regiones.');
+      }
+    };
+
+    fetchRegions();
+  }, []);
+
+  const selectedRegion = regiones.find((r) => r.id === regionId);
 
   // Verifica dominio del correo
   const emailDomainValid = (email) => {
@@ -31,14 +49,14 @@ export default function RegisterPage() {
 
   // Cambio de región → actualiza comunas
   const handleRegionChange = (e) => {
-    const nuevaRegion = e.target.value;
-    setRegion(nuevaRegion);
-    const regionObj = regiones.find((r) => r.nombre === nuevaRegion);
+    const nuevaRegionId = e.target.value;
+    setRegionId(nuevaRegionId);
+    const regionObj = regiones.find((r) => r.id === nuevaRegionId);
     setComuna(regionObj?.comunas?.[0] || '');
   };
 
   // Registro
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!emailDomainValid(correo)) {
@@ -50,36 +68,42 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!selectedRegion) {
+      alert('Selecciona una región válida.');
+      return;
+    }
+
     try {
-      // Guarda el usuario y abre sesión
-      const nuevo = registerUser({
-        run,
-        nombres,
-        apellidos,
-        correo,
-        password,
+      const payload = {
+        nombre: nombres,
+        apellido: apellidos,
+        rut: run,
         direccion,
-        region,
+        region: selectedRegion,
         comuna,
-        tipoUsuario: correo.endsWith('@admin.cl') ? 'Administrador' : 'Cliente',
-      });
+        email: correo,
+        password,
+      };
 
-      // Redirección según tipo
-      if (nuevo.tipoUsuario === 'Administrador') navigate('/admin');
-      else navigate('/');
+      await register(payload);
+      alert('Registro exitoso. Inicia sesión para continuar.');
+      navigate('/login');
 
-      // Limpia formulario
-      setRun(''); 
-      setNombres(''); 
+      setRun('');
+      setNombres('');
       setApellidos('');
-      setCorreo(''); 
-      setPassword(''); 
+      setCorreo('');
+      setPassword('');
       setDireccion('');
-      setRegion(regiones[0].nombre); 
-      setComuna(regiones[0].comunas[0]);
-      setTipoUsuario('Cliente');
+      setRegionId(regiones[0]?.id || '');
+      setComuna(regiones[0]?.comunas?.[0] || '');
     } catch (err) {
-      alert(err.message || 'No se pudo registrar.');
+      const status = err?.response?.status;
+      let message = 'No se pudo registrar.';
+      if (status === 409) message = 'El correo ya está registrado.';
+      else if (status === 400) message = 'Datos inválidos. Revisa los campos ingresados.';
+      else if (status === 404) message = 'Región o comuna inválida.';
+      alert(message);
     }
   };
 
@@ -97,26 +121,16 @@ export default function RegisterPage() {
 
           <Select
             label="Región"
-            options={regiones.map((r) => ({ value: r.nombre, label: r.nombre }))}
-            value={region}
+            options={regiones.map((r) => ({ value: r.id, label: r.nombre }))}
+            value={regionId}
             onChange={handleRegionChange}
           />
 
           <Select
             label="Comuna"
-            options={(regiones.find((r) => r.nombre === region)?.comunas || []).map((c) => ({ value: c, label: c }))}
+            options={(selectedRegion?.comunas || []).map((c) => ({ value: c, label: c }))}
             value={comuna}
             onChange={(e) => setComuna(e.target.value)}
-          />
-
-          <Select
-            label="Tipo de usuario"
-            options={[
-              { value: 'Cliente', label: 'Cliente' },
-              { value: 'Administrador', label: 'Administrador' },
-            ]}
-            value={tipoUsuario}
-            onChange={(e) => setTipoUsuario(e.target.value)}
           />
 
           <Button type="submit" style={{ width: '100%' }}>

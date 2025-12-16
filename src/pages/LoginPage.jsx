@@ -3,26 +3,31 @@ import { useNavigate } from "react-router-dom";
 import Input from "../atoms/Input.jsx";
 import Button from "../atoms/Button.jsx";
 import Card from "../atoms/Card.jsx";
-import { loginUser } from "../data/userStore.js";
+import { login } from "../services/authService.js";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
 
-  const onSubmit = (e) => {
-  e.preventDefault();
-  try {
-    const u = loginUser(correo, password);
-    if (u.tipoUsuario === 'Administrador' || u.correo.endsWith('@admin.cl')) {
-      window.location.href = '/admin';
-    } else {
-      window.location.href = '/';
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(correo, password);
+      if (correo.endsWith("@admin.cl")) {
+        window.location.href = "/admin";
+      } else {
+        navigate("/");
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      let message = "No se pudo iniciar sesión.";
+      if (status === 401) message = "Credenciales inválidas.";
+      else if (status === 400) message = "Datos inválidos. Verifica el correo y la contraseña.";
+      else if (status === 404) message = "Usuario no encontrado.";
+      alert(message);
     }
-  } catch (err) {
-    alert(err.message);
-  }
-};
+  };
 
   return (
     <div>
